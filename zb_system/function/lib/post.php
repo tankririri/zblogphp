@@ -28,9 +28,8 @@ class Post extends Base {
      */
     public function __call($method, $args) {
         foreach ($GLOBALS['hooks']['Filter_Plugin_Post_Call'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($this, $method, $args);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
         }
     }
 
@@ -60,7 +59,7 @@ class Post extends Base {
 
         $a = $zbp->LoadTagsByIDString($this->Tag);
         $s = '';
-        $c = '';
+        $c = array();
         foreach ($b as $key) {
             if (isset($zbp->tags[$key])) {
                 $c[] = $zbp->tags[$key]->Name;
@@ -138,9 +137,8 @@ class Post extends Base {
             break;
         case 'Url':
             foreach ($GLOBALS['hooks']['Filter_Plugin_Post_Url'] as $fpname => &$fpsignal) {
-                $fpsignal = PLUGIN_EXITSIGNAL_NONE;
                 $fpreturn = $fpname($this);
-                if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+                if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
             }
             $u = new UrlRule($zbp->GetPostType_UrlRule($this->Type));
             $u->Rules['{%id%}'] = $this->ID;
@@ -191,10 +189,12 @@ class Post extends Base {
             foreach ($GLOBALS['hooks']['Filter_Plugin_Post_CommentPostUrl'] as $fpname => &$fpsignal) {
                 $fpreturn = $fpname($this);
                 if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;
+
                     return $fpreturn;
                 }
             }
             $key = '&amp;key=' . $zbp->GetCmtKey($this->ID);
+
             return $zbp->host . 'zb_system/cmd.php?act=cmt&amp;postid=' . $this->ID . $key;
             break;
         case 'ValidCodeUrl':
@@ -203,6 +203,13 @@ class Post extends Base {
         case 'Prev':
             if ($this->_prev !== '') {
                 return $this->_prev;
+            }
+
+            foreach ($GLOBALS['hooks']['Filter_Plugin_Post_Prev'] as $fpname => &$fpsignal) {
+                $this->_prev = $fpname($this);
+                if ($this->_prev !== '') {
+                    return $this->_prev;
+                }
             }
 
             $articles = $zbp->GetPostList(
@@ -225,6 +232,13 @@ class Post extends Base {
                 return $this->_next;
             }
 
+            foreach ($GLOBALS['hooks']['Filter_Plugin_Post_Next'] as $fpname => &$fpsignal) {
+                $this->_prev = $fpname($this);
+                if ($this->_prev !== '') {
+                    return $this->_prev;
+                }
+            }
+
             $articles = $zbp->GetPostList(
                 array('*'),
                 array(array('=', 'log_Type', 0), array('=', 'log_Status', 0), array('>', 'log_PostTime', $this->PostTime)),
@@ -244,6 +258,7 @@ class Post extends Base {
             foreach ($GLOBALS['hooks']['Filter_Plugin_Post_RelatedList'] as $fpname => &$fpsignal) {
                 $fpreturn = $fpname($this);
                 if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;
+
                     return $fpreturn;
                 }
             }
@@ -281,9 +296,8 @@ class Post extends Base {
         }
 
         foreach ($GLOBALS['hooks']['Filter_Plugin_Post_Save'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($this);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
         }
 
         return parent::Save();
@@ -293,10 +307,12 @@ class Post extends Base {
      * @return bool
      */
     public function Del() {
+        global $zbp;
+        if ($this->ID > 0) unset($zbp->posts[$this->ID]);
+
         foreach ($GLOBALS['hooks']['Filter_Plugin_Post_Del'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($this);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
         }
 
         return parent::Del();

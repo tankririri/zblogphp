@@ -324,9 +324,11 @@ class ZBlogPHP {
      */
     public function __call($method, $args) {
         foreach ($GLOBALS['hooks']['Filter_Plugin_Zbp_Call'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($method, $args);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {
+                $fpsignal = PLUGIN_EXITSIGNAL_NONE;            	
+                return $fpreturn;
+            }
         }
         trigger_error($this->lang['error'][81], E_USER_WARNING);
     }
@@ -339,9 +341,11 @@ class ZBlogPHP {
      */
     public function __set($name, $value) {
         foreach ($GLOBALS['hooks']['Filter_Plugin_Zbp_Set'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($name, $value);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {
+                $fpsignal = PLUGIN_EXITSIGNAL_NONE;            	
+                return $fpreturn;
+            }
         }
         trigger_error($this->lang['error'][81], E_USER_WARNING);
     }
@@ -353,9 +357,11 @@ class ZBlogPHP {
      */
     public function __get($name) {
         foreach ($GLOBALS['hooks']['Filter_Plugin_Zbp_Get'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($name);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {
+                $fpsignal = PLUGIN_EXITSIGNAL_NONE;            	
+                return $fpreturn;
+            }
         }
         trigger_error($this->lang['error'][81], E_USER_WARNING);
     }
@@ -493,7 +499,8 @@ class ZBlogPHP {
         #$this->LoadTags();
         $this->LoadModules();
 
-        $this->Verify();
+        if( !(get_class($this->user) === 'Member' && $this->user->Level > 0 && $this->user->ID > 0) )
+            $this->Verify();
 
         $this->RegBuildModule('catalog', 'ModuleBuilder::Catalog');
         $this->RegBuildModule('calendar', 'ModuleBuilder::Calendar');
@@ -536,7 +543,8 @@ class ZBlogPHP {
      */
     public function LoadManage() {
 
-        $this->host = GetCurrentHost($this->path, $this->cookiespath);
+        if ($this->option['ZC_PERMANENT_DOMAIN_WITH_ADMIN'] == false)
+            $this->host = GetCurrentHost($this->path, $this->cookiespath);
 
         if (substr($this->host, 0, 8) == 'https://') {
             $this->ishttps = true;
@@ -557,7 +565,7 @@ class ZBlogPHP {
         Add_Filter_Plugin('Filter_Plugin_Admin_ModuleMng_SubMenu', 'Include_Admin_Addmodsubmenu');
         Add_Filter_Plugin('Filter_Plugin_Admin_CommentMng_SubMenu', 'Include_Admin_Addcmtsubmenu');
 
-        $this->CheckTemplate();
+        $this->CheckTemplate(true);
 
         foreach ($GLOBALS['hooks']['Filter_Plugin_Zbp_LoadManage'] as $fpname => &$fpsignal) {
             $fpname();
@@ -682,14 +690,11 @@ class ZBlogPHP {
      * @return bool
      */
     public function StartSession() {
-        if ($this->issession == true) {
-            return false;
+        if ( session_status() == 1 ){
+            session_start();
+            $this->issession = true;
+            return true;
         }
-
-        session_start();
-        $this->issession = true;
-
-        return true;
     }
 
     /**
@@ -697,15 +702,11 @@ class ZBlogPHP {
      * @return bool
      */
     public function EndSession() {
-        if ($this->issession == false) {
-            return false;
+        if ( session_status() == 2 ){
+            session_write_close();
+            $this->issession = false;
+            return true;
         }
-
-        session_unset();
-        session_destroy();
-        $this->issession = false;
-
-        return true;
     }
 
 ################################################################################################################
@@ -765,7 +766,7 @@ class ZBlogPHP {
         }
 
         $this->configs[$name]->Delete();
-
+        unset($this->configs[$name]);
         return true;
     }
 
@@ -793,7 +794,7 @@ class ZBlogPHP {
      * @return bool
      */
     public function HasConfig($name) {
-        return isset($this->configs[$name]);
+        return isset($this->configs[$name]) && $this->configs[$name]->CountItem()>0;
     }
 
 ################################################################################################################
@@ -889,7 +890,13 @@ class ZBlogPHP {
             $this->Config('system')->$key = $value;
         }
 
-        $this->Config('system')->ZC_BLOG_HOST = chunk_split($this->Config('system')->ZC_BLOG_HOST, 1, "|");
+        if(function_exists('mb_split')){
+            $a = mb_split('', $this->Config('system')->ZC_BLOG_HOST, 1);
+            $this->Config('system')->ZC_BLOG_HOST = implode("|", $a);
+        } else {
+            $this->Config('system')->ZC_BLOG_HOST = chunk_split($this->Config('system')->ZC_BLOG_HOST, 1, "|");
+        }
+
         $this->SaveConfig('system');
 
         return true;
@@ -964,16 +971,18 @@ class ZBlogPHP {
      * @param string $action 操作
      * @return bool
      */
-    public function CheckRights($action, $level=null) {
+    public function CheckRights($action, $level = null) {
 
         if($level === null){
             $level = $this->user->Level;
         }
 
         foreach ($GLOBALS['hooks']['Filter_Plugin_Zbp_CheckRights'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($action, $level);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {
+                $fpsignal = PLUGIN_EXITSIGNAL_NONE;            	
+                return $fpreturn;
+            }
         }
         if (!isset($this->actions[$action])) {
             if (is_numeric($action)) {
@@ -1002,14 +1011,25 @@ class ZBlogPHP {
         $m = null;
         $u = trim(GetVars('username', 'COOKIE'));
         $p = trim(GetVars('password', 'COOKIE'));
+        //if ($this->Verify_Token($u, $p, 'zbp', $m) == true) {
         if ($this->Verify_MD5Path($u, $p, $m) == true) {
             $this->user = $m;
 
             return true;
         }
         $this->user = new Member;
-
+        $this->user->Guid = GetGuid();
         return false;
+    }
+
+    /**
+     * 返回登录成功后应保存的cookie信息(COOKIE中的密码)
+     * @param member $m 已验过成功的member
+     * @return string
+     */
+    public function VerifyResult($m) {
+        //return $m->GetHashByToken('zbp',1000);
+        return $m->GetHashByMD5Path();
     }
 
     /**
@@ -1098,6 +1118,31 @@ class ZBlogPHP {
     }
 
 
+    /**
+     * 验证用户登录（使用Token，替代密码保存）
+     * @param string $name 用户名
+     * @param string $wt WebToken
+     * @param string $wt_id WebToken的ID识别符
+     * @param object $member 返回读取成功的member对象
+     * @return bool
+     */
+    public function Verify_Token($name, $wt, $wt_id, &$member = null) {
+        if ($name == '' || $wt == '') {
+            return false;
+        }
+        $m = null;
+        $m = $this->GetMemberByName($name);
+        if ($m->ID > 0) {
+            if( VerifyWebToken($wt, $wt_id, $this->guid, $m->ID, $m->Password) === true ){
+                $member = $m;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
 ################################################################################################################
     #加载函数
 
@@ -1129,6 +1174,7 @@ class ZBlogPHP {
     public function LoadCategorys() {
 
         $this->categories = array();
+        $this->categoriesbyorder = array();
         $lv0 = array();
         $lv1 = array();
         $lv2 = array();
@@ -1158,12 +1204,14 @@ class ZBlogPHP {
             if (!isset($lv1[$id0])) {continue;}
             foreach ($lv1[$id0] as $id1) {
                 if ($this->categories[$id1]->ParentID == $id0) {
+                    $this->categories[$id1]->RootID = $id0;
                     $this->categories[$id0]->SubCategories[] = $this->categories[$id1];
                     $this->categories[$id0]->ChildrenCategories[] = $this->categories[$id1];
                     $this->categoriesbyorder[$id1] = &$this->categories[$id1];
                     if (!isset($lv2[$id1])) {continue;}
                     foreach ($lv2[$id1] as $id2) {
                         if ($this->categories[$id2]->ParentID == $id1) {
+                            $this->categories[$id2]->RootID = $id0;
                             $this->categories[$id0]->ChildrenCategories[] = $this->categories[$id2];
                             $this->categories[$id1]->SubCategorys[] = $this->categories[$id2];
                             $this->categories[$id1]->ChildrenCategories[] = $this->categories[$id2];
@@ -1171,6 +1219,7 @@ class ZBlogPHP {
                             if (!isset($lv3[$id2])) {continue;}
                             foreach ($lv3[$id2] as $id3) {
                                 if ($this->categories[$id3]->ParentID == $id2) {
+                                    $this->categories[$id3]->RootID = $id0;
                                     $this->categories[$id0]->ChildrenCategories[] = $this->categories[$id3];
                                     $this->categories[$id1]->ChildrenCategories[] = $this->categories[$id3];
                                     $this->categories[$id2]->SubCategorys[] = $this->categories[$id3];
@@ -1215,19 +1264,17 @@ class ZBlogPHP {
         }
 
         $dir = $this->usersdir . 'theme/' . $this->theme . '/include/';
-        if (!file_exists($dir)) {
-            return null;
-        }
-
-        $files = GetFilesInDir($dir, 'php');
-        foreach ($files as $sortname => $fullname) {
-            $m = new Module();
-            $m->FileName = $sortname;
-            $m->Content = file_get_contents($fullname);
-            $m->Type = 'div';
-            $m->Source = 'theme';
-            $this->modules[] = $m;
-            $this->modulesbyfilename[$m->FileName] = $m;
+        if (file_exists($dir)) {
+            $files = GetFilesInDir($dir, 'php');
+            foreach ($files as $sortname => $fullname) {
+                $m = new Module();
+                $m->FileName = $sortname;
+                $m->Content = file_get_contents($fullname);
+                $m->Type = 'div';
+                $m->Source = 'theme';
+                $this->modules[] = $m;
+                $this->modulesbyfilename[$m->FileName] = $m;
+            }
         }
 
     }
@@ -1248,6 +1295,7 @@ class ZBlogPHP {
                 $allthemes[] = $app;
             }
         }
+
         return $allthemes;
 
     }
@@ -1267,6 +1315,7 @@ class ZBlogPHP {
                 $allplugins[] = $app;
             }
         }
+
         return $allplugins;
 
     }
@@ -1308,6 +1357,7 @@ class ZBlogPHP {
     public function GetPreActivePlugin() {
         $ap = explode("|", $this->option['ZC_USING_PLUGIN_LIST']);
         $ap = array_unique($ap);
+
         return $ap;
     }
 
@@ -1347,7 +1397,7 @@ class ZBlogPHP {
             break;
         }
 
-        $handle = opendir($languagePath);
+        $handle = @opendir($languagePath);
         $match = null;
         if ($handle) {
             while (false !== ($file = readdir($handle))) {
@@ -1445,17 +1495,32 @@ class ZBlogPHP {
 
     /**
      * 更新模板缓存
+     * @param boolean $onlycheck 为真的话，只判断是否需要而不Build
+     * @param boolean $forcebuild     
+     * @return true or false
      */
-    public function CheckTemplate() {
+    public function CheckTemplate($onlycheck = false, $forcebuild = false) {
 
         $this->template->LoadTemplates();
         $s = implode($this->template->templates);
         $md5 = md5($s);
+
         if ($md5 != $this->cache->templates_md5) {
+            if($onlycheck == true && $forcebuild == false){
+                return false;
+            }
             $this->BuildTemplate();
             $this->cache->templates_md5 = $md5;
             $this->SaveCache();
+        } else {
+            if ($forcebuild == true) {
+                $this->BuildTemplate();
+                $this->cache->templates_md5 = $md5;
+                $this->SaveCache();
+            }
         }
+
+        return true;
 
     }
 
@@ -1662,8 +1727,21 @@ class ZBlogPHP {
 
         if (empty($select)) {$select = array('*');}
         if (empty($where)) {$where = array();}
+
         if (is_array($where)) {
-            array_unshift($where, array('=', 'log_Type', '0'));
+            $hasType = false;
+            foreach ($where as $key => $value) {
+                if(is_array($value)){
+                    foreach ($value as $key2 => $value2) {
+                        if($key2 == 1 && $value2 == 'log_Type'){
+                            $hasType = true;
+                        }
+                    }
+                }
+            }
+            if(!$hasType){
+                array_unshift($where, array('=', 'log_Type', '0'));
+            }
         }
 
         $sql = $this->db->sql->Select($this->table['Post'], $select, $where, $order, $limit, $option);
@@ -1861,18 +1939,19 @@ class ZBlogPHP {
         if ($object != null) {
             //$modules非ID为key
             if ($className == "Module") {
-                if($id>0){
+                if($id > 0){
                     foreach ($object as $key => $value) {
-                        if($value->ID==$id)return $value;
+                        if($value->ID == $id)return $value;
                     }
                 }
                 $m = new Module;
+
                 return $m;
             }
 
             if (isset($object[$id])) {
                 return $object[$id];
-            } elseif ($className == "Post" || $className == "Comment") {
+            } elseif ($className == "Post" || $className == "Comment" || $className == "Tag") {
                 // 文章需要读取，其他的直接返回空对象即可
                 $p = new $className;
                 $p->LoadInfoByID($id);
@@ -2010,8 +2089,13 @@ class ZBlogPHP {
         $ret = $this->GetSomeThing('members', 'ID', $id, 'Member');
         if ($ret->ID == 0) {
             $ret->Guid = GetGuid();
-        } else {
-            $this->membersbyname[$ret->Name] = &$this->members[$ret->ID];
+            //如果是部份加载用户
+            if ( $this->option['ZC_LOADMEMBERS_LEVEL'] <> 0 ){
+                if ( $ret->LoadInfoByID($id) == true ){
+                    $this->members[$ret->ID] = $ret;
+                    $this->membersbyname[$ret->Name] = &$this->members[$ret->ID];
+                }
+            }
         }
 
         return $ret;
@@ -2044,16 +2128,15 @@ class ZBlogPHP {
         $am = $this->GetListType('Member', $sql);
         if (count($am) > 0) {
             $m = $am[0];
-            $this->members[$m->ID] = $m;
-            $this->membersbyname[$m->Name] = &$this->members[$m->ID];
+            if(!isset($this->members[$m->ID]))
+                $this->members[$m->ID] = $m;
+            if(!isset($this->membersbyname[$m->Name]))
+                $this->membersbyname[$m->Name] = &$this->members[$m->ID];
 
             return $m;
         };
 
-        $m = new Member;
-        $m->Guid = GetGuid();
-
-        return $m;
+        return new Member;
     }
 
     /**
@@ -2063,7 +2146,7 @@ class ZBlogPHP {
      */
     public function GetMemberByNameOrAlias($name) {
         $name = trim($name);
-        if (!$name || !CheckRegExp($name, '[username]')) {
+        if (!$name || !(CheckRegExp($name, '[username]')||CheckRegExp($name, '[nickname]'))  ) {
             return new Member;
         }
 
@@ -2084,8 +2167,36 @@ class ZBlogPHP {
         $am = $this->GetListType('Member', $sql);
         if (count($am) > 0) {
             $m = $am[0];
-            $this->members[$m->ID] = $m;
-            $this->membersbyname[$m->Name] = &$this->members[$m->ID];
+            if(!isset($this->members[$m->ID]))
+                $this->members[$m->ID] = $m;
+            if(!isset($this->membersbyname[$m->Name]))
+                $this->membersbyname[$m->Name] = &$this->members[$m->ID];
+
+            return $m;
+        };
+
+        return new Member;
+    }
+
+    /**
+     * 通过邮箱名获取用户实例(不区分大小写)
+     * @param string $email
+     * @return Member
+     */
+    public function GetMemberByEmail($email) {
+        $email = strtolower(trim($email));
+        if (!$email || !CheckRegExp($email, '[email]')) {
+            return new Member;
+        }
+
+        $sql = $this->db->sql->Select($this->table['Member'], '*', array(array('LIKE', 'mem_Email', $email)), null, 1, null);
+        $am = $this->GetListType('Member', $sql);
+        if (count($am) > 0) {
+            $m = $am[0];
+            if(!isset($this->members[$m->ID]))
+                $this->members[$m->ID] = $m;
+            if(!isset($this->membersbyname[$m->Name]))
+                $this->membersbyname[$m->Name] = &$this->members[$m->ID];
 
             return $m;
         };
@@ -2112,6 +2223,15 @@ class ZBlogPHP {
     }
 
     /**
+     * 检查指定邮箱的用户是否存在(不区分大小写)
+     */
+    public function CheckMemberByEmailExist($email) {
+        $m = $this->GetMemberByEmail($email);
+
+        return ($m->ID > 0);
+    }
+
+    /**
      * 通过ID获取评论实例
      * @param int $id
      * @return Comment
@@ -2126,7 +2246,7 @@ class ZBlogPHP {
      * @return Upload
      */
     public function GetUploadByID($id) {
-        return $this->GetSomeThing('', 'id', $id, 'Upload');
+        return $this->GetSomeThing('', 'ID', $id, 'Upload');
     }
 
     /**
@@ -2148,7 +2268,19 @@ class ZBlogPHP {
      * @return Tag
      */
     public function GetTagByAliasOrName($name) {
-        return $this->GetTagByAlias($name, 'Name');
+        //return $this->GetTagByAlias($name, 'Name');
+        $a = array();
+        $a[] = array('tag_Alias', $name);
+        $a[] = array('tag_Name', $name);
+        $array = $this->GetTagList('*', array(array('array', $a)), '', 1, '');
+        if(count($array) == 0) {
+            return new Tag;
+        } else {
+            $this->tags[$array[0]->ID] = $array[0];
+            $this->tagsbyname[$array[0]->ID] = &$this->tags[$array[0]->ID];
+
+            return $this->tags[$array[0]->ID];
+        }
     }
 
     /**
@@ -2333,12 +2465,39 @@ class ZBlogPHP {
     }
 
     /**
+     * 获取会话WebToken
+     * @param $wt_id
+     * @param $day 默认1天有效期，1小时为1/24，1分钟为1/(24*60)
+     * @return string
+     */
+    public function GetWebToken($wt_id = '', $day = 1 ) {
+        $t = intval( $day * 24 * 3600 ) + time();
+        return CreateWebToken($wt_id, $t ,$this->guid, $this->user->Status, $this->user->ID, $this->user->Password);
+    }
+
+    /**
+     * 验证会话WebToken
+     * @param $wt
+     * @param $wt_id
+     * @return bool
+     */
+    public function ValidWebToken($wt, $wt_id = '') {
+
+        if( VerifyWebToken($wt, $wt_id, $this->guid, $this->user->Status, $this->user->ID, $this->user->Password) === true ){
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * 获取会话Token
      * @param $s
      * @return string
      */
-    public function GetToken($s = '') {
-        return md5($this->guid . $this->user->Guid . $s . date('Ymdh'));
+    public function GetToken($id = '') {
+        $s = $this->user->ID . $this->user->Password . $this->user->Status;
+        return md5($this->guid . $s . $id . date('Ymdh'));
     }
 
     /**
@@ -2347,11 +2506,12 @@ class ZBlogPHP {
      * @param $s
      * @return bool
      */
-    public function ValidToken($t, $s = '') {
-        if ($t == md5($this->guid . $this->user->Guid . $s . date('Ymdh'))) {
+    public function ValidToken($t, $id = '') {
+        $s = $this->user->ID . $this->user->Password . $this->user->Status;
+        if ($t == md5($this->guid . $s . $id . date('Ymdh'))) {
             return true;
         }
-        if ($t == md5($this->guid . $this->user->Guid . $s. date('Ymdh', time() - (3600 * 1)))) {
+        if ($t == md5($this->guid . $s . $id. date('Ymdh', time() - (3600 * 1)))) {
             return true;
         }
 
@@ -2393,9 +2553,9 @@ class ZBlogPHP {
         $original = GetVars('captcha_' . crc32($this->guid . $id), 'COOKIE');
         setcookie('captcha_' . crc32($this->guid . $id), '', time() - 3600, $this->cookiespath);
 
-        return (md5($this->guid . date("Ymdh") . $vaidcode) == $original
+        return (md5($this->guid . date("Ymdh") . strtolower($vaidcode) ) == $original
                 ||
-                md5($this->guid . date("Ymdh", time() - (3600 * 1)) . $vaidcode) == $original
+                md5($this->guid . date("Ymdh", time() - (3600 * 1)) . strtolower($vaidcode) ) == $original
                 );
     }
 
@@ -2580,9 +2740,9 @@ class ZBlogPHP {
         ZBlogException::$error_line = $line;
 
         foreach ($GLOBALS['hooks']['Filter_Plugin_Zbp_ShowError'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($errorCode, $errorText, $file, $line);
             if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {
+                $fpsignal = PLUGIN_EXITSIGNAL_NONE;            	
                 return $fpreturn;
             }
         }
@@ -2678,7 +2838,7 @@ class ZBlogPHP {
         $host = str_replace(array('https://', 'http://'), array('', ''), GetCurrentHost(ZBP_PATH, $null));
         $host2 = str_replace(array('https://', 'http://'), array('', ''), $this->host);
 
-        if (stripos($host, $host2) === false) {
+        if ($host != $host2) {
             $u = GetRequestUri();
             $u = $this->host . substr($u, 1, strlen($u));
             Redirect301($u);

@@ -24,7 +24,13 @@ if (count($_POST) > 0) {
     $zbp->option['ZC_AUTHOR_REGEX'] = trim(GetVars('ZC_AUTHOR_REGEX', 'POST'));
     $zbp->SaveOption();
 
-    $zbp->AddBuildModuleAll();
+    $zbp->AddBuildModule('archives');
+    $zbp->AddBuildModule('tags');
+    $zbp->AddBuildModule('authors');
+    $zbp->AddBuildModule('previous');
+    $zbp->AddBuildModule('catalog');
+    $zbp->AddBuildModule('navbar');
+
     $zbp->BuildModule();
     $zbp->SetHint('good');
     if ($zbp->option['ZC_STATIC_MODE'] == 'REWRITE' && strpos($zbp->option['ZC_ARTICLE_REGEX'], '{%host%}index.php') === false) {
@@ -72,7 +78,7 @@ $ua = array(
     ),
 
     'ZC_TAGS_REGEX' => array(
-        '{%host%}?tags={%alias%}&page={%page%}',
+        '{%host%}?tags={%id%}&page={%page%}',
         '{%host%}index.php/tags-{%id%}_{%page%}.html',
         '{%host%}tags-{%id%}_{%page%}.html',
         '{%host%}tags-{%alias%}_{%page%}.html',

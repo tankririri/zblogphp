@@ -71,9 +71,8 @@ class Template {
      */
     public function GetTemplate($name) {
         foreach ($GLOBALS['hooks']['Filter_Plugin_Template_GetTemplate'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($this, $name);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
         }
 
         return $this->path . $name . '.php';
@@ -113,7 +112,8 @@ class Template {
      * @param $array
      */
     public function SetTagsAll(&$array) {
-        $this->templateTags = array_merge_recursive($this->templateTags, $array);
+        if(is_array($array))
+            $this->templateTags = $array + $this->templateTags;
     }
 
     /**
@@ -178,7 +178,7 @@ class Template {
 
         if (strpos($templates['header'], '{$header}') === false) {
             if (strpos($templates['header'], '</head>') !== false) {
-                $templates['header'] = str_replace('</head>', '</head>' . '{$header}', $templates['header']);
+                $templates['header'] = str_replace('</head>', '{$header}' . '</head>', $templates['header']);
             } else {
                 $templates['header'] .= '{$header}';
             }
@@ -205,9 +205,8 @@ class Template {
     public function CompileFile($content) {
 
         foreach ($GLOBALS['hooks']['Filter_Plugin_Template_Compiling_Begin'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($this, $content);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
         }
 
         // Step 1: 替换<?php块
@@ -236,9 +235,8 @@ class Template {
         $this->parse_back_uncompile_code($content);
 
         foreach ($GLOBALS['hooks']['Filter_Plugin_Template_Compiling_End'] as $fpname => &$fpsignal) {
-            $fpsignal = PLUGIN_EXITSIGNAL_NONE;
             $fpreturn = $fpname($this, $content);
-            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+            if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
         }
 
         return $content;
@@ -333,7 +331,7 @@ class Template {
      * @param $content
      */
     protected function parse_function(&$content) {
-        $content = preg_replace_callback('/\{([a-zA-Z0-9_]+?)\((.+?)\)\}/', array($this, 'parse_funtion_replace_dot'), $content);
+        $content = preg_replace_callback('/\{([a-zA-Z0-9_]+?)\((.*?)\)\}/', array($this, 'parse_funtion_replace_dot'), $content);
     }
 
     /**
@@ -432,7 +430,8 @@ class Template {
      * @return string
      */
     protected function parse_vars_replace_dot($matches) {
-        if (strpos($matches[1], '=') === false || strpos($matches[1], '=>') !== false) {
+        $s = str_replace('=>', '', $matches[1]);
+        if (strpos($s, '=') === false) {
             return '{php} echo $' . $this->replace_dot($matches[1]) . '; {/php}';
         } else {
             return '{php} $' . $this->replace_dot($matches[1]) . '; {/php}';
@@ -488,6 +487,12 @@ class Template {
         if (!is_readable($f)) {
             $zbp->ShowError(86, __FILE__, __LINE__);
         }
+
+		$ak = array_keys($this->staticTags);
+		$av = array_values($this->staticTags);
+		foreach($zbp->modulesbyfilename as &$m)
+			$m->Content = str_replace($ak,$av,$m->Content);
+		unset($ak,$av);
 
         #入口处将tags里的变量提升全局!!!
         foreach ($this->templateTags as $key => &$value) {
@@ -587,6 +592,8 @@ class Template {
         $this->templateTags['version'] = &$zbp->version;
         $this->templateTags['categorys'] = &$zbp->categories;
         $this->templateTags['categories'] = &$zbp->categories;
+        $this->templateTags['categorysbyorder'] = &$zbp->categoriesbyorder;
+        $this->templateTags['categoriesbyorder'] = &$zbp->categoriesbyorder;        
         $this->templateTags['modules'] = &$zbp->modulesbyfilename;
         $this->templateTags['title'] = htmlspecialchars($zbp->title);
         $this->templateTags['host'] = &$zbp->host;
@@ -659,7 +666,7 @@ class Template {
         $this->staticTags = $t + $o;
     }
     public function ReplaceStaticTags($s) {
-        $s = str_replace(array_keys($this->replaceTags), array_values($this->replaceTags), $s);
+        $s = str_replace(array_keys($this->staticTags), array_values($this->staticTags), $s);
         return $s;
     }
 }

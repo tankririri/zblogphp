@@ -1,4 +1,5 @@
 <?php
+header('Content-type: application/json');
 
 require '../../../zb_system/function/c_system_base.php';
 require '../../../zb_system/function/c_system_admin.php';
@@ -14,41 +15,24 @@ if (!$zbp->CheckPlugin('linkmanage')) {
 }
 
 switch (GetVars('type', 'GET')) {
-    case 'sort':
-        linkmanage_saveNav();
-        break;
-    case 'menu':
-        linkmanage_creatLink();
+    case 'save_menu':
+        linkmanage_saveMenu();
         break;
     case 'del_link':
         linkmanage_deleteLink(GetVars('id', 'POST'),GetVars('menuid', 'POST'));
         break;
-
+    case 'save_link':
+        //linkmanage_saveLink();
+        linkmanage_saveLink_s(GetVars('menuid', 'POST'));
+        break;
+    case 'save_sort':
+        //linkmanage_saveLink();
+        linkmanage_saveLink_s_sort(GetVars('menuid', 'POST'));
+        break;
+    case 'save_config':
+        linkmanage_saveConfig();
+        break;
     default:
         # code...
         break;
-}
-
-
-if (GetVars('type', 'GET') == 'save_link') {
-    $menu = json_decode($zbp->Config('linkmanage')->Menu, true);
-    $new_menu = array();
-    foreach ($_POST as $key => $value) {
-        $new_menu[$key] = $value;
-    }
-    $new_menu['type'] = $menu['ID'.$new_menu['id']]['type'];
-    $menu['ID'.$new_menu['id']] = $new_menu;
-    // $menu[] = array(
-    // 	"id" => "123456",
-    // 	"title" => "导航栏",
-    // 	"url" => "",
-    // 	"newtable" => "true",
-    // 	"img" => "",
-    // 	"type" => "",
-    // );
-    $zbp->Config('linkmanage')->Menu = json_encode($menu);
-    $zbp->SaveConfig('linkmanage');
-
-    echo json_encode($_POST);
-    die();
 }

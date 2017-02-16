@@ -74,7 +74,8 @@ class DbMySQLi implements iDataBase {
             }else{
                 $u = "utf8";
             }
-            mysqli_set_charset($db, $u);
+            if(mysqli_set_charset($db, $u) == false)
+                mysqli_set_charset($db, "utf8");
 
             $this->db = $db;
             $this->dbname = $array[3];
@@ -106,7 +107,8 @@ class DbMySQLi implements iDataBase {
         }else{
             $u = "utf8";
         }
-        mysqli_set_charset($db, $u);
+        if(mysqli_set_charset($db, $u) == false)
+            mysqli_set_charset($db, "utf8");
 
         $this->db = $db;
         $this->dbname = $dbmysql_name;
@@ -120,10 +122,11 @@ class DbMySQLi implements iDataBase {
             }
         }
         if ($c == 0) {
-            mysqli_query($this->db, $this->sql->Filter('CREATE DATABASE ' . $dbmysql_name));
-
+            $r=mysqli_query($this->db, $this->sql->Filter('CREATE DATABASE ' . $dbmysql_name));
+            if($r === false)return false;
             return true;
         }
+
     }
 
     /**
@@ -132,8 +135,8 @@ class DbMySQLi implements iDataBase {
     public function Close() {
         if (is_object($this->db)) {
             mysqli_close($this->db);
+            $this->db = null;
         }
-
     }
 
     /**

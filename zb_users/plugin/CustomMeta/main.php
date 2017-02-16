@@ -123,7 +123,7 @@ require $blogpath . 'zb_system/admin/admin_top.php';
                 echo '{$tag.Metas.'.$value.'}<br/>php调用形式:<br/>$tag->Metas->'.$value.';';
             }
             if($type == 'member'){
-                echo '文章页模板调用标签：{{$article.Author.Metas.'.$value.'}<br/> 作者页调用标签：{$author.Metas.'.$value.'}<br/>php调用形式:<br/>$article->Author->Metas->'.$value.';<br/>$zbp->member[<abbr title="请替换成相应的用户ID">?</abbr>]->Metas->'.$value.';<br/>';
+                echo '文章页模板调用标签：{{$article.Author.Metas.'.$value.'}<br/> 作者页调用标签：{$author.Metas.'.$value.'}<br/>php调用形式:<br/>$article->Author->Metas->'.$value.';<br/>$zbp->members[<abbr title="请替换成相应的用户ID">?</abbr>]->Metas->'.$value.';<br/>';
             }
 
                 echo '</p></td>';
@@ -134,12 +134,15 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 
 ?>
 		<tr>
+		<td colspan="3">&nbsp;添加一个Meta标签</td>
+		</tr>
+		<tr>
 		<td><p>名称：<input type="text" style="width:84%" name="meta[]" value="" id="meta-new"/></p></td>
-		<td colspan="2"><p>新增字段</p></td>
+		<td colspan="2"><p>新增Meta字段名称</p></td>
 		</tr>
 	  </table>
 	  <hr/>
-	  <input type="submit" class="button" value="<?php echo $lang['msg']['submit']?>" />
+	  <input type="submit" class="button" value="提交" />
 	</form>
 
   </div>

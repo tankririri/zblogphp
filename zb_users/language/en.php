@@ -64,11 +64,13 @@ return array(
         'article' => 'Published',
         'page' => 'Page',
         'year_month' => '%y%-%m%',
+        'year_month_day' => '%y%-%m%-%d%',
         'number_page' => 'Page %num%',
         'parent_category' => 'Parent',
         'password' => 'Password',
         're_password' => 'Repeat Password',
         'upload_file' => 'File Upload',
+        'auto_rename_uploadfile' => 'Auto rename filename',
         'username' => 'Username',
         'return_to_site' => 'Visit Site',
         'check_comment' => 'Pending',
@@ -171,9 +173,9 @@ return array(
         'member_level' => 'User Level',
         'disable_comment' => 'Disable Comments',
         'default_template' => 'Default Template',
-        'generate_summary' => 'Custom Summary',
+        'generate_summary' => 'Generate Summary',
         'add_to_navbar' => 'Add to Navigation Bar',
-        'help_generate_summary' => 'The &lt;hr class=&quot;more&quot; /&gt; tag inserted into the post body text, Z-BlogPHP will be identify summary. And you can ',
+        'help_generate_summary' => 'We\'ll use the content before the first horizontal as the summary. In addition, by clicking the link you can let system ',
         'use_commas_to_separate' => 'Separated by Commas',
         'show_common_tags' => 'Choose from the most used tags',
         'category_aritles_default_template' => 'The Default Template for the Category',
@@ -242,6 +244,7 @@ return array(
         'comment_audit' => 'Aduit Comments',
         'comment_audit_comment' => 'All new comments posted by non-root user will be audited.',
         'debugging_warning' => 'If your website can be connected via Internet, please disable the Development Mode, or it may be hacked.',
+        'permanent_domain_with_admin' => 'Fixed domain both on background',
         '' => '',
     ),
 
@@ -408,7 +411,7 @@ return array(
         '5' => 'No Unauthorized Access',
         '6' => 'Not Permitted',
         '7' => 'Username is not in the correct format, it may be too long or is empty.',
-        '8' => 'Login Failed for User',
+        '8' => 'Login Failed',
         '9' => 'This Post does not exist, or permission is too low.',
         '10' => 'System Initialization Failed',
         '11' => 'Update Post Failed',
@@ -490,6 +493,9 @@ return array(
         '87' => 'Registered Type Failed',
         '88' => 'The file that you uploaded not exist, maybe exceed the maximum upload limit of the server.',
         '89' => 'Error when loading JavaScript.',
+        '90' => 'Alias disallow special symbols.',
+        '91' => 'PHP version is too old to enable this application, it requires %s and above.',
+        '92' => 'Missing %s function, can not enable this application.',
     ),
 
     'offical_urls' => array(
@@ -509,9 +515,17 @@ return array(
 		',
         '8' => '
 			Have you entered the correct name and password? <br/>
-			If you are the webmaster and have forgotten your password, you can click [More] to download the retrieve tool. <br/>
+			If you are the webmaster and have forgotten your password, you can click to download <a href="https://wiki.zblogcn.com/doku.php?id=zblogphp:error:%E9%A6%96%E9%A1%B5#error-8" target="_blank">[Login Failed]</a>. <br/>
 			<br/>
 		',
+        '91' => '
+             Your PHP version may be too old to enable this application. You\'d better to contact your host and upgrade to the latest PHP version they can provide. <br/>
+             For security and efficiency, we also strongly recommend to update your PHP to the latest version.
+         ',
+        '92' => '
+             Your environment may be missing some of the necessary extensions, please contact your host to enable these extensions to use this application. <br/> <br/>
+             You can <a href="https://wiki.zblogcn.com/doku.php?id=zblogphp:error:%E9%A6%96%E9%A1%B5#error-92" target="_blank"> click here to get a rough list of missing extensions. </a>
+         ',
 
         'other' => array(
             // Other errors then
@@ -537,7 +551,7 @@ return array(
 
         'end' => '
 			If you are a visitor, this may be something happened. Please try again later, or contact the webmaster. <br/>
-			If you are the webmaster, You can click on <a href="{%morehelp%}" target="_blank"> [more] </a> to get more help from Z-Blog Wiki(Chinese only). Therefore, to publish a thread in English in <a href="http://bbs.zblogcn.com/" target="_blank">Z-Blog official forum </a> with detailed error description and screenshots for help is a choice.
+			If you are the webmaster, You can click on <a href="{%morehelp%}" target="_blank"> [more] </a> to get more help from Z-Blog Wiki(Chinese only). Therefore, to publish a thread in English in <a href="https://bbs.zblogcn.com/" target="_blank">Z-Blog official forum </a> with detailed error description and screenshots for help is a choice.
 		',
     ),
 );

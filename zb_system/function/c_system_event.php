@@ -19,10 +19,9 @@ function VerifyLogin() {
     if ($zbp->Verify_MD5(GetVars('username', 'POST'), GetVars('password', 'POST'), $m)) {
         $zbp->user = $m;
         $un = $m->Name;
-        $ps = $m->PassWord_MD5Path;
+        $ps = $zbp->VerifyResult($m);
         $sd = (int) GetVars('savedate');
         $addinfo = array();
-        $addinfo['dishtml5'] = (int) GetVars('dishtml5', 'POST');
         $addinfo['chkadmin'] = (int) $zbp->CheckRights('admin');
         $addinfo['chkarticle'] = (int) $zbp->CheckRights('ArticleEdt');
         $addinfo['levelname'] = $m->LevelName;
@@ -45,6 +44,10 @@ function VerifyLogin() {
             setcookie("addinfo" . str_replace('/', '', $zbp->cookiespath), json_encode($addinfo), $sdt, $zbp->cookiespath);
         }
 
+        foreach ($GLOBALS['hooks']['Filter_Plugin_VerifyLogin_Succeed'] as $fpname => &$fpsignal) {
+            $fpname();
+        }
+
         return true;
     } else {
         $zbp->ShowError(8, __FILE__, __LINE__);
@@ -61,6 +64,9 @@ function Logout() {
     setcookie('password', '', time() - 3600, $zbp->cookiespath);
     setcookie("addinfo" . str_replace('/', '', $zbp->cookiespath), '', time() - 3600, $zbp->cookiespath);
 
+    foreach ($GLOBALS['hooks']['Filter_Plugin_Logout_Succeed'] as $fpname => &$fpsignal) {
+        $fpname();
+    }
 }
 
 ################################################################################################################
@@ -515,35 +521,75 @@ function ViewAuto($inpurl) {
             return null;
         }
 
-        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_DATE_REGEX'], 'date');
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_DATE_REGEX'], 'date', false);
         $m = array();
         if (preg_match($r, $url, $m) == 1) {
-            ViewList($m['page'], null, null, $m, null, true);
-
-            return null;
+            isset($m['page']) ? null : $m['page'] = 0;
+            $result = ViewList($m['page'], null, null, $m, null, true);
+            if ($result == true) {
+                return null;
+            }
         }
 
-        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_AUTHOR_REGEX'], 'auth');
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_DATE_REGEX'], 'date', true);
+        $m = array();
+        if (preg_match($r, $url, $m) == 1) {
+            $result = ViewList($m['page'], null, null, $m, null, true);
+            if ($result == true) {
+                return null;
+            }
+        }
+
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_AUTHOR_REGEX'], 'auth', false);
+        $m = array();
+        if (preg_match($r, $url, $m) == 1) {
+            isset($m['page']) ? null : $m['page'] = 0;
+            $result = ViewList($m['page'], null, $m, null, null, true);
+            if ($result == true) {
+                return null;
+            }
+        }
+
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_AUTHOR_REGEX'], 'auth', true);
         $m = array();
         if (preg_match($r, $url, $m) == 1) {
             $result = ViewList($m['page'], null, $m, null, null, true);
             if ($result == true) {
                 return null;
             }
-
         }
 
-        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_TAGS_REGEX'], 'tags');
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_TAGS_REGEX'], 'tags', false);
+        $m = array();
+        if (preg_match($r, $url, $m) == 1) {
+            isset($m['page']) ? null : $m['page'] = 0;
+            $result = ViewList($m['page'], null, null, null, $m, true);
+            if ($result == true) {
+                return null;
+            }
+        }
+
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_TAGS_REGEX'], 'tags', true);
         $m = array();
         if (preg_match($r, $url, $m) == 1) {
             $result = ViewList($m['page'], null, null, null, $m, true);
             if ($result == true) {
                 return null;
             }
+        }
+
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_CATEGORY_REGEX'], 'cate', false);
+        $m = array();
+        if (preg_match($r, $url, $m) == 1) {
+            isset($m['page']) ? null : $m['page'] = 0;
+            $result = ViewList($m['page'], $m, null, null, null, true);
+            if ($result == true) {
+                return null;
+            }
 
         }
 
-        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_CATEGORY_REGEX'], 'cate');
+        $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_CATEGORY_REGEX'], 'cate', true);
         $m = array();
         if (preg_match($r, $url, $m) == 1) {
             $result = ViewList($m['page'], $m, null, null, null, true);
@@ -555,7 +601,6 @@ function ViewAuto($inpurl) {
 
         $r = UrlRule::OutputUrlRegEx($zbp->option['ZC_ARTICLE_REGEX'], 'article');
         $m = array();
-
         if (preg_match($r, $url, $m) == 1) {
             $result = ViewPost($m, null, true);
             if ($result == false) {
@@ -619,7 +664,8 @@ function ViewList($page, $cate, $auth, $date, $tags, $isrewrite = false) {
     global $zbp;
 
     foreach ($GLOBALS['hooks']['Filter_Plugin_ViewList_Begin'] as $fpname => &$fpsignal) {
-        $fpreturn = $fpname($page, $cate, $auth, $date, $tags);
+        $fpargs = func_get_args();
+        $fpreturn = call_user_func_array( $fpname, $fpargs );
         if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {
             $fpsignal = PLUGIN_EXITSIGNAL_NONE;
 
@@ -678,7 +724,12 @@ function ViewList($page, $cate, $auth, $date, $tags, $isrewrite = false) {
         if (!is_array($cate)) {
             $cateId = $cate;
             $cate = array();
-            $cate['id'] = $cateId;
+            if (strpos($zbp->option['ZC_CATEGORY_REGEX'], '{%id%}') !== false) {
+                $cate['id'] = $cateId;
+            }
+            if (strpos($zbp->option['ZC_CATEGORY_REGEX'], '{%alias%}') !== false) {
+                $cate['alias'] = $cateId;
+            }
         }
         if (isset($cate['id'])) {
             $category = $zbp->GetCategoryByID($cate['id']);
@@ -723,16 +774,21 @@ function ViewList($page, $cate, $auth, $date, $tags, $isrewrite = false) {
         if (!is_array($auth)) {
             $authId = $auth;
             $auth = array();
-            $auth['id'] = $authId;
+            if (strpos($zbp->option['ZC_AUTHOR_REGEX'], '{%id%}') !== false) {
+                $auth['id'] = $authId;
+            }
+            if (strpos($zbp->option['ZC_AUTHOR_REGEX'], '{%alias%}') !== false) {
+                $auth['alias'] = $authId;
+            }
         }
         if (isset($auth['id'])) {
             $author = $zbp->GetMemberByID($auth['id']);
         } else {
-            $author = $zbp->GetMemberByAliasOrName($auth['alias']);
+            $author = $zbp->GetMemberByNameOrAlias($auth['alias']);
         }
 
         if ($author->ID == 0) {
-            if ($isrewrite == true) {
+            if ($isrewrite) {
                 return false;
             }
 
@@ -752,13 +808,31 @@ function ViewList($page, $cate, $auth, $date, $tags, $isrewrite = false) {
     ########################################################################################################
     case 'date':
         $pagebar = new Pagebar($zbp->option['ZC_DATE_REGEX']);
+
         if (!is_array($date)) {
-            $datetime = strtotime($date);
+            $datetime = $date;
         } else {
-            $datetime = strtotime($date['date']);
+            $datetime = $date['date'];
         }
 
-        $datetitle = str_replace(array('%y%', '%m%'), array(date('Y', $datetime), date('n', $datetime)), $zbp->lang['msg']['year_month']);
+        $dateregex_ymd = '/[0-9]{1,4}-[0-9]{1,2}-[0-9]{1,2}/i';
+        $dateregex_ym = '/[0-9]{1,4}-[0-9]{1,2}/i';
+
+        if(preg_match($dateregex_ymd, $datetime) == 0 && preg_match($dateregex_ym, $datetime) == 0){
+            return false;
+        }
+        $datetime_txt = $datetime;
+        $datetime = strtotime($datetime);
+        if($datetime == false){
+            return false;
+        }
+
+        if(preg_match($dateregex_ymd, $datetime_txt) != 0 && isset($zbp->lang['msg']['year_month_day'])){
+            $datetitle = str_replace(array('%y%', '%m%', '%d%'), array(date('Y', $datetime), date('n', $datetime), date('j', $datetime)), $zbp->lang['msg']['year_month_day']);
+        }else{
+            $datetitle = str_replace(array('%y%', '%m%'), array(date('Y', $datetime), date('n', $datetime)), $zbp->lang['msg']['year_month']);
+        }
+
         if ($page == 1) {
             $zbp->title = $datetitle;
         } else {
@@ -768,8 +842,15 @@ function ViewList($page, $cate, $auth, $date, $tags, $isrewrite = false) {
         $zbp->modulesbyfilename['calendar']->Content = ModuleBuilder::Calendar(date('Y', $datetime) . '-' . date('n', $datetime));
 
         $template = $zbp->option['ZC_INDEX_DEFAULT_TEMPLATE'];
-        $w[] = array('BETWEEN', 'log_PostTime', $datetime, strtotime('+1 month', $datetime));
-        $pagebar->UrlRule->Rules['{%date%}'] = $date;
+
+        if(preg_match($dateregex_ymd, $datetime_txt) != 0){
+            $w[] = array('BETWEEN', 'log_PostTime', $datetime, strtotime('+1 day', $datetime));
+            $pagebar->UrlRule->Rules['{%date%}'] = date('Y-n-j', $datetime);
+        } else {
+            $w[] = array('BETWEEN', 'log_PostTime', $datetime, strtotime('+1 month', $datetime));
+            $pagebar->UrlRule->Rules['{%date%}'] = date('Y-n', $datetime);
+        }
+
         $datetime = Metas::ConvertArray(getdate($datetime));
         break;
     ########################################################################################################
@@ -780,7 +861,12 @@ function ViewList($page, $cate, $auth, $date, $tags, $isrewrite = false) {
         if (!is_array($tags)) {
             $tagId = $tags;
             $tags = array();
-            $tags['id'] = $tagId;
+            if (strpos($zbp->option['ZC_TAGS_REGEX'], '{%id%}') !== false) {
+                $tags['id'] = $tagId;
+            }
+            if (strpos($zbp->option['ZC_TAGS_REGEX'], '{%alias%}') !== false) {
+                $tags['alias'] = $tagId;
+            }
         }
         if (isset($tags['id'])) {
             $tag = $zbp->GetTagByID($tags['id']);
@@ -852,7 +938,7 @@ function ViewList($page, $cate, $auth, $date, $tags, $isrewrite = false) {
     $limit = array(($pagebar->PageNow - 1) * $pagebar->PageCount, $pagebar->PageCount);
     $option = array('pagebar' => $pagebar);
 
-    foreach ($GLOBALS['hooks']['Filter_Plugin_LargeData_Aritcle'] as $fpname => &$fpsignal) {
+    foreach ($GLOBALS['hooks']['Filter_Plugin_LargeData_Article'] as $fpname => &$fpsignal) {
         $fpreturn = $fpname($select, $w, $order, $limit, $option);
     }
 
@@ -912,10 +998,15 @@ function ViewPost($object, $theSecondParam, $isrewrite = false) {
         $id = $object;
         $alias = $theSecondParam;
         $object = array('id' => $object);
+        $object[0] = $id;
+        $object['id'] = $id;
     }
 
     foreach ($GLOBALS['hooks']['Filter_Plugin_ViewPost_Begin'] as $fpname => &$fpsignal) {
-        $fpreturn = $fpname($id, $alias);
+        $fpargs = func_get_args();
+        $fpargs[0] = $id;
+        $fpargs[1] = $alias;
+        $fpreturn = call_user_func_array( $fpname, $fpargs );
         if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {
             $fpsignal = PLUGIN_EXITSIGNAL_NONE;
 
@@ -942,28 +1033,6 @@ function ViewPost($object, $theSecondParam, $isrewrite = false) {
         exit;
     }
 
-    // 验证传递的参数的时间是否存在问题
-    if (isset($object['year'])) {
-        if (isset($object['month'])) {
-            if (isset($object['day'])) {
-                $postTime = $object['year'] . '-' . $object['month'] . '-' . $object['day'];
-                $timestamp = strtotime($postTime);
-                $w[] = array('>=', 'log_PostTime', $timestamp);
-                $w[] = array('<=', 'log_PostTime', $timestamp + 86400); // 1 day = 86400 s
-            } else {
-                $postTime = $object['year'] . '-' . $object['month'];
-                $timestamp = strtotime($postTime);
-                $w[] = array('>=', 'log_PostTime', $timestamp);
-                $w[] = array('<=', 'log_PostTime', strtotime($postTime . ' +1 month')); // 卧槽跪拜PHP
-            }
-        } else {
-            $postTime = $object['year'] . '-1';
-            $timestamp = strtotime($postTime);
-            $w[] = array('>=', 'log_PostTime', $timestamp);
-            $w[] = array('<=', 'log_PostTime', strtotime($postTime . ' +1 year'));
-        }
-    }
-
     if (!($zbp->CheckRights('ArticleAll') && $zbp->CheckRights('PageAll'))) {
         $w[] = array('=', 'log_Status', 0);
     }
@@ -979,16 +1048,10 @@ function ViewPost($object, $theSecondParam, $isrewrite = false) {
 
     $article = $articles[0];
 
-    // TODO: 验证分类
 
-    // 再验证一下时间（排除某些像只有{%month%}没有{%year%}的情况
-    $articleTime = getdate($article->PostTime);
-    if (
-        (isset($object['year']) && $object['year'] != $articleTime['year']) ||
-        (isset($object['month']) && $object['month'] != $articleTime['mon']) ||
-        (isset($object['day']) && $object['day'] != $articleTime['mday'])
-    ) {
+    if ($isrewrite && !(stripos(urldecode($article->Url), $object[0]) !== false)) {
         $zbp->ShowError(2, __FILE__, __LINE__);
+        exit;
     }
 
     if ($article->Type == 0) {
@@ -1229,8 +1292,11 @@ function PostArticle() {
             }
         } else {
             if (isset($_POST['Intro'])) {
-                if ($_POST['Intro'] == '') {
-                    $_POST['Intro'] = SubStrUTF8_Html($_POST['Content'], $zbp->option['ZC_ARTICLE_EXCERPT_MAX']);
+                if ($_POST['Intro'] == '' || (stripos($_POST['Intro'], '<!--autointro-->') !== false)) {
+                    //$_POST['Intro'] = SubStrUTF8_Html($_POST['Content'], (int) strpos($_POST['Content'], '>') + (int) $zbp->option['ZC_ARTICLE_EXCERPT_MAX']);
+                    //改纯HTML摘要
+                    $_POST['Intro'] = TransferHTML($_POST['Content'], "[nohtml]");
+                    $_POST['Intro'] = SubStrUTF8_Html($_POST['Intro'], (int) $zbp->option['ZC_ARTICLE_EXCERPT_MAX']);
                     $_POST['Intro'] .= '<!--autointro-->';
                 }
                 $_POST['Intro'] = CloseTags($_POST['Intro']);
@@ -1308,12 +1374,13 @@ function PostArticle() {
         }
     }
 
+    FilterMeta($article);
+
     foreach ($GLOBALS['hooks']['Filter_Plugin_PostArticle_Core'] as $fpname => &$fpsignal) {
         $fpname($article);
     }
 
     FilterPost($article);
-    FilterMeta($article);
 
     $article->Save();
 
@@ -1565,12 +1632,13 @@ function PostPage() {
 
     $article->Type = ZC_POST_TYPE_PAGE;
 
+    FilterMeta($article);
+
     foreach ($GLOBALS['hooks']['Filter_Plugin_PostPage_Core'] as $fpname => &$fpsignal) {
         $fpname($article);
     }
 
     FilterPost($article);
-    FilterMeta($article);
 
     $article->Save();
 
@@ -1987,15 +2055,16 @@ function PostCategory() {
         }
     }
 
-    foreach ($GLOBALS['hooks']['Filter_Plugin_PostCategory_Core'] as $fpname => &$fpsignal) {
-        $fpname($cate);
-    }
+    FilterMeta($cate);
 
     //刷新RootID
     $cate->Level;
 
+    foreach ($GLOBALS['hooks']['Filter_Plugin_PostCategory_Core'] as $fpname => &$fpsignal) {
+        $fpname($cate);
+    }
+
     FilterCategory($cate);
-    FilterMeta($cate);
 
     // 此处用作刷新分类内文章数据使用，不作更改
     if ($cate->ID > 0) {
@@ -2033,8 +2102,9 @@ function DelCategory() {
     $cate = $zbp->GetCategoryByID($id);
     if ($cate->ID > 0) {
 
-        if(count($cate->SubCategories)>0){
+        if(count($cate->SubCategories) > 0){
             $zbp->ShowError(49, __FILE__, __LINE__);
+
             return false;
         }
 
@@ -2092,14 +2162,17 @@ function PostTag() {
         }
     }
 
+    FilterMeta($tag);
+
     foreach ($GLOBALS['hooks']['Filter_Plugin_PostTag_Core'] as $fpname => &$fpsignal) {
         $fpname($tag);
     }
 
     FilterTag($tag);
-    FilterMeta($tag);
 
-    CountTag($tag);
+    if ($zbp->option['ZC_LARGE_DATA'] == false) {
+        CountTag($tag);
+    }
 
     $tag->Save();
 
@@ -2157,7 +2230,7 @@ function PostMember() {
     }
 
     //检测密码
-    if(trim($_POST["Password"])=='' || trim($_POST["PasswordRe"])=='' || $_POST["Password"]!=$_POST["PasswordRe"]){
+    if(trim($_POST["Password"]) == '' || trim($_POST["PasswordRe"]) == '' || $_POST["Password"] != $_POST["PasswordRe"]){
         unset($_POST["Password"]);
         unset($_POST["PasswordRe"]);
     }
@@ -2179,10 +2252,9 @@ function PostMember() {
 
     if (isset($data['Name'])) {
         // 检测同名
-        if (isset($zbp->membersbyname[$data['Name']])) {
-            if ($zbp->membersbyname[$data['Name']]->ID != $data['ID']) {
-                $zbp->ShowError(62, __FILE__, __LINE__);
-            }
+        $m = $zbp->GetMemberByName($data['Name']);
+        if ($m->ID > 0 && $m->ID != $data['ID']) {
+            $zbp->ShowError(62, __FILE__, __LINE__);
         }
     }
 
@@ -2195,6 +2267,7 @@ function PostMember() {
             $zbp->ShowError(73, __FILE__, __LINE__);
         }
         $data['IP'] = GetGuestIP();
+        if ($mem->Guid == '') $mem->Guid = GetGuid();
     } else {
         $mem->LoadInfoByID($data['ID']);
     }
@@ -2222,14 +2295,15 @@ function PostMember() {
         }
     }
 
+    FilterMeta($mem);
+
     foreach ($GLOBALS['hooks']['Filter_Plugin_PostMember_Core'] as $fpname => &$fpsignal) {
         $fpname($mem);
     }
 
     FilterMember($mem);
-    FilterMeta($mem);
 
-    CountMember($mem);
+    CountMember($mem, array(null, null, null, null));
 
     // 查询同名
     if (isset($data['Name'])) {
@@ -2370,16 +2444,18 @@ function PostModule() {
         $mod->NoRefresh = (bool) $_POST['NoRefresh'];
     }
 
+    FilterMeta($mod);
+
     foreach ($GLOBALS['hooks']['Filter_Plugin_PostModule_Core'] as $fpname => &$fpsignal) {
         $fpname($mod);
     }
 
     FilterModule($mod);
-    FilterMeta($mod);
 
     $mod->Save();
 
-    $zbp->AddBuildModule($mod->FileName);
+    if( (int)GetVars('ID', 'POST') > 0 )
+        $zbp->AddBuildModule($mod->FileName);
 
     foreach ($GLOBALS['hooks']['Filter_Plugin_PostModule_Succeed'] as $fpname => &$fpsignal) {
         $fpname($mod);
@@ -2438,15 +2514,32 @@ function PostUpload() {
     foreach ($_FILES as $key => $value) {
         if ($_FILES[$key]['error'] == 0) {
             if (is_uploaded_file($_FILES[$key]['tmp_name'])) {
-                $tmp_name = $_FILES[$key]['tmp_name'];
-                $name = $_FILES[$key]['name'];
-
                 $upload = new Upload;
                 $upload->Name = $_FILES[$key]['name'];
+                if (GetVars('auto_rename', 'POST') == 'on' || GetVars('auto_rename', 'POST') == true) {
+                    $temp_arr = explode(".", $upload->Name);
+                    $file_ext = strtolower(trim(array_pop($temp_arr)));
+                    $upload->Name = date("YmdHis") . time() . rand(10000, 99999) . '.' . $file_ext;
+                }
                 $upload->SourceName = $_FILES[$key]['name'];
                 $upload->MimeType = $_FILES[$key]['type'];
                 $upload->Size = $_FILES[$key]['size'];
                 $upload->AuthorID = $zbp->user->ID;
+
+
+                //检查同月重名
+                $d1 = date('Y-m-01', time());
+                $d2 = date('Y-m-d', strtotime(date('Y-m-01', time()) . ' +1 month -1 day'));
+                $d1 = strtotime($d1);
+                $d2 = strtotime($d2);
+                $w = array();
+                $w[] = array('=', 'ul_Name', $upload->Name);
+                $w[] = array('>=', 'ul_PostTime', $d1);
+                $w[] = array('<=', 'ul_PostTime', $d2);
+                $uploads = $zbp->GetUploadList('*', $w);
+                if(count($uploads) > 0){
+                    $zbp->ShowError(28, __FILE__, __LINE__);
+                }
 
                 if (!$upload->CheckExtName()) {
                     $zbp->ShowError(26, __FILE__, __LINE__);
@@ -2594,6 +2687,7 @@ function SetTheme($theme, $style) {
 
     if ($oldtheme != $theme) {
         UninstallPlugin($oldtheme);
+
         return $theme;
     }
 }
@@ -2631,7 +2725,8 @@ function SaveSetting() {
             $key == 'ZC_GZIP_ENABLE' ||
             $key == 'ZC_SYNTAXHIGHLIGHTER_ENABLE' ||
             $key == 'ZC_COMMENT_VERIFY_ENABLE' ||
-            $key == 'ZC_CLOSE_SITE'
+            $key == 'ZC_CLOSE_SITE' ||
+            $key == 'ZC_PERMANENT_DOMAIN_WITH_ADMIN'
         ) {
             $zbp->option[$key] = (boolean) $value;
             continue;
@@ -2666,10 +2761,20 @@ function SaveSetting() {
         $zbp->option[$key] = trim(str_replace(array("\r", "\n"), array("", ""), $value));
     }
 
+
     $zbp->option['ZC_BLOG_HOST'] = trim($zbp->option['ZC_BLOG_HOST']);
     $zbp->option['ZC_BLOG_HOST'] = trim($zbp->option['ZC_BLOG_HOST'], '/') . '/';
     if ($zbp->option['ZC_BLOG_HOST'] == '/') {
         $zbp->option['ZC_BLOG_HOST'] = $zbp->host;
+    }
+    $usePC = false;
+    for ($i = 0; $i < strlen($zbp->option['ZC_BLOG_HOST']) - 1; $i++) {
+        $l = substr($zbp->option['ZC_BLOG_HOST'], $i, 1);
+        if(ord($l) >= 192) $usePC = true;
+    }
+    if ($usePC && function_exists('mb_strtolower')) {
+        $Punycode = new Punycode();
+        $zbp->option['ZC_BLOG_HOST'] = $Punycode->encode($zbp->option['ZC_BLOG_HOST']);
     }
     $lang = require $zbp->usersdir . 'language/' . $zbp->option['ZC_BLOG_LANGUAGEPACK'] . '.php';
     $zbp->option['ZC_BLOG_LANGUAGE'] = $lang['lang'];
@@ -2719,9 +2824,9 @@ function FilterComment(&$comment) {
         $zbp->ShowError(30, __FILE__, __LINE__);
     }
 
-    $comment->Name = SubStrUTF8_Start($comment->Name, 0, 20);
-    $comment->Email = SubStrUTF8_Start($comment->Email, 0, 30);
-    $comment->HomePage = SubStrUTF8_Start($comment->HomePage, 0, 100);
+    $comment->Name = SubStrUTF8_Start($comment->Name, 0, $zbp->option['ZC_USERNAME_MAX']);
+    $comment->Email = SubStrUTF8_Start($comment->Email, 0, $zbp->option['ZC_EMAIL_MAX']);
+    $comment->HomePage = SubStrUTF8_Start($comment->HomePage, 0, $zbp->option['ZC_HOMEPAGE_MAX']);
 
     $comment->Content = TransferHTML($comment->Content, '[nohtml]');
 
@@ -2783,9 +2888,14 @@ function FilterMember(&$member) {
         $zbp->ShowError(77, __FILE__, __LINE__);
     }
 
+    if ($member->Alias !== '' && !CheckRegExp($member->Alias, '[nickname]')) {
+        $zbp->ShowError(90, __FILE__, __LINE__);
+    }
+
     if (!CheckRegExp($member->Email, '[email]')) {
         $member->Email = 'null@null.com';
     }
+    $member->Email = strtolower($member->Email);
 
     if (substr($member->HomePage, 0, 4) != 'http') {
         $member->HomePage = 'http://' . $member->HomePage;
@@ -3062,9 +3172,11 @@ function CountMember(&$member, $plus = array(null, null, null, null)) {
     }
 
     if ($plus[2] === null) {
-        $s = $zbp->db->sql->Count($zbp->table['Comment'], array(array('COUNT', '*', 'num')), array(array('=', 'comm_AuthorID', $id)));
-        $member_Comments = GetValueInArrayByCurrent($zbp->db->Query($s), 'num');
-        $member->Comments = $member_Comments;
+        if ($member->ID > 0){
+            $s = $zbp->db->sql->Count($zbp->table['Comment'], array(array('COUNT', '*', 'num')), array(array('=', 'comm_AuthorID', $id)));
+            $member_Comments = GetValueInArrayByCurrent($zbp->db->Query($s), 'num');
+            $member->Comments = $member_Comments;
+        }
     } else {
         $member->Comments += $plus[2];
     }

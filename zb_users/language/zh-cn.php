@@ -60,11 +60,13 @@ return array(
         'article' => '文章',
         'page' => '页面',
         'year_month' => '%y%年%m%月',
+        'year_month_day' => '%y%年%m%月%d%日',
         'number_page' => '第%num%页',
         'parent_category' => '父分类',
         'password' => '密码',
         're_password' => '确认密码',
         'upload_file' => '选择需要上传的文件',
+        'auto_rename_uploadfile' => '自动重命名文件名',
         'username' => '用户名',
         'return_to_site' => '返回',
         'check_comment' => '审核评论',
@@ -151,8 +153,8 @@ return array(
         'theme' => '主题',
         'system_module' => '系统模块',
         'user_module' => '用户自定义模块',
-        'theme_module' => '主题自带模块',
-        'plugin_module' => '插件创建模块',
+        'theme_module' => '主题include文件夹存储的文件型模块',
+        'plugin_module' => '主题和插件创建的模块',
         'sidebar' => '默认侧栏 ',
         'sidebar2' => '侧栏 2',
         'sidebar3' => '侧栏 3',
@@ -167,9 +169,9 @@ return array(
         'member_level' => '用户级别',
         'disable_comment' => '禁止评论',
         'default_template' => '默认模板',
-        'generate_summary' => '手动生成摘要',
+        'generate_summary' => '自动生成摘要',
         'add_to_navbar' => '加入导航栏菜单',
-        'help_generate_summary' => '在正文插入分隔符&quot;&lt;hr class=&quot;more&quot; /&gt;&quot;可以让系统识别摘要内容。如需另外指定摘要内容，请点击',
+        'help_generate_summary' => '在正文插入首条分隔符，则分隔符以上的内容将作为摘要。您也可以',
         'use_commas_to_separate' => '逗号分割',
         'show_common_tags' => '显示常用标签',
         'category_aritles_default_template' => '该分类文章的默认模板',
@@ -238,6 +240,7 @@ return array(
         'comment_audit' => '审核评论',
         'comment_audit_comment' => '打开后所有非管理员发布的评论都将进入审核状态',
         'debugging_warning' => '您的Z-BlogPHP打开了开发模式。此模式下网站有被黑的风险，实际部署在线上的网站请及时关闭开发模式！',
+        'permanent_domain_with_admin' => '后台也使用固定域名',
         '' => '',
     ),
 
@@ -482,10 +485,13 @@ return array(
         '83' => '启用该应用，需要先启用依赖应用%s',
         '84' => '停用该应用，需要先停用被依赖应用%s',
         '85' => '启用该应用，需要先停用冲突应用%s',
-        '86' => '主题模板的编译文件不存在',
-        '87' => '注册类型失败',
-        '88' => '上传的文件不存在，可能超过了服务器最大上传限制',
-        '89' => '后台JavaScript加载失败',
+        '86' => '主题模板的编译文件不存在。',
+        '87' => '注册类型失败。',
+        '88' => '上传的文件不存在，可能超过了服务器最大上传限制。',
+        '89' => '后台JavaScript加载失败！',
+        '90' => '别名不允许使用特殊符号。',
+        '91' => 'PHP版本太旧，该应用要求使用 %s 及以上版本。',
+        '92' => '缺少 %s 函数，无法启用本应用',
     ),
 
     'offical_urls' => array(
@@ -505,9 +511,17 @@ return array(
 		',
         '8' => '
 			您是否输入了正确的用户名和密码？<br/>
-			如果您是网站管理员且忘记了密码，可以点击【更多帮助】下载密码找回工具。<br/>
+			如果您是网站管理员且忘记了密码，可以点击<a href="https://wiki.zblogcn.com/doku.php?id=zblogphp:error:%E9%A6%96%E9%A1%B5#error-8" target="_blank">【登录失败】</a>。<br/>
 			<br/>
 		',
+        '91' => '
+            您的PHP版本可能太旧，请您联系您的主机商，把PHP版本升级为他们所能提供的最新版本。<br/>
+            为了安全与效率，我们也强烈建议您把您的PHP更新到最新版本。
+        ',
+        '92' => '
+            您的主机环境可能缺少某些必要组件，请联系您的主机商启用这些组件，才可使用本应用。<br/>
+            您可以<a href="https://wiki.zblogcn.com/doku.php?id=zblogphp:error:%E9%A6%96%E9%A1%B5#error-92" target="_blank">点击这里，来获得缺少组件的大致列表。</a>
+        ',
 
         'other' => array(
             // Other errors then
@@ -540,7 +554,7 @@ return array(
 
         'end' => '
 			如果您是访客，这说明网站程序可能出现了一些错误。请您稍后再试，或联系站长。<br/>
-			如果您是站长，您可以点击<a href="{%morehelp%}" target="_blank">【更多信息】</a>来查看Z-Blog官方关于这个错误的说明，也可以到<a href="http://bbs.zblogcn.com/" target="_blank">Z-Blog官方论坛</a>，附上错误详细截图与描述寻求帮助。
+			如果您是站长，您可以点击<a href="{%morehelp%}" target="_blank">【更多信息】</a>来查看Z-Blog官方关于这个错误的说明，也可以到<a href="https://bbs.zblogcn.com/" target="_blank">Z-Blog官方论坛</a>，附上错误详细截图与描述寻求帮助。
 		',
     ),
 

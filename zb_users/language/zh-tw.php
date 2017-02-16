@@ -64,11 +64,13 @@ return array(
         'article' => '文章',
         'page' => '頁面',
         'year_month' => '%y%年%m%月',
+        'year_month_day' => '%y%年%m%月%d%日',
         'number_page' => '第%num%頁',
         'parent_category' => '父分類',
         'password' => '密碼',
         're_password' => '確認密碼',
         'upload_file' => '選擇需要上傳的檔案',
+        'auto_rename_uploadfile' => '自動重命名檔案名',
         'username' => '帳號',
         'return_to_site' => '造訪網站',
         'check_comment' => '待審中',
@@ -171,9 +173,9 @@ return array(
         'member_level' => '帳號角色',
         'disable_comment' => '禁止迴響',
         'default_template' => '默認模板',
-        'generate_summary' => '自訂摘要',
+        'generate_summary' => '生成摘要',
         'add_to_navbar' => '加入導覽列選單',
-        'help_generate_summary' => '在正文裡插入&lt;hr class=&quot;more&quot; /&gt;水平分隔線，系統會識別摘要。或者',
+        'help_generate_summary' => '在正文插入首條分隔符，則分隔符以上的內容將作為摘要。您也可以',
         'use_commas_to_separate' => '逗號隔開',
         'show_common_tags' => '顯示常用標籤',
         'category_aritles_default_template' => '該分類文章的默認模板',
@@ -242,6 +244,7 @@ return array(
         'comment_audit' => '審核迴響',
         'comment_audit_comment' => '打開後所有非管理員發布的迴響都將進入審核狀態',
         'debugging_warning' => '您的Z-BlogPHP處於開發模式下。此模式下網站有被骇的風險，實際部署在線上的網站請及時關閉開發模式！',
+        'permanent_domain_with_admin' => '后台也使用永久域名',
         '' => '',
     ),
 
@@ -490,6 +493,9 @@ return array(
         '87' => '註冊類型失敗',
         '88' => '上傳的檔案不存在，可能超過了最大上傳限制',
         '89' => 'JavaScript加載失敗，可能被服務器拦截',
+        '90' => '代稱不允許使用特殊符號',
+        '91' => 'PHP版本太舊，該應用要求使用 %s 及以上版本。 ',
+        '92' => '缺少 %s 函數，無法啟用本應用'
     ),
 
 
@@ -510,9 +516,17 @@ return array(
 		',
         '8' => '
 			您是否輸入了正確的名稱和密碼？<br/>
-			如果您是管理員且忘記了密碼，可以點擊【更多幫助】下載密碼找回工具。<br/>
+			如果您是管理員且忘記了密碼，可以點擊<a href="https://wiki.zblogcn.com/doku.php?id=zblogphp:error:%E9%A6%96%E9%A1%B5#error-8" target="_blank">【登入失敗】</a>。<br/>
 			<br/>
 		',
+        '91' => '
+            您的PHP版本可能太舊，請您聯繫您的主機商，把PHP版本升級為他們所能提供的最新版本。 <br/>
+            為了安全與效率，我們也強烈建議您把您的PHP更新到最新版本。
+        ',
+        '92' => '
+            您的主機環境可能缺少某些必要組件，請聯繫您的主機商啟用這些組件，才可使用本應用。 <br/>
+            您可以<a href="https://wiki.zblogcn.com/doku.php?id=zblogphp:error:%E9%A6%96%E9%A1%B5#error-92" target="_blank">點擊這裡，來獲得缺少組件的大致列表。 </a>
+        ',
 
         'other' => array(
             // Other errors then
@@ -545,7 +559,7 @@ return array(
 
         'end' => '
 			如果您是訪客，這說明網站程式可能出現了一些錯誤。請您稍後再試，或聯繫站長。 <br/>
-            如果您是站長，您可以點擊<a href="{%morehelp%}" target="_blank">【更多幫助】</a>來查看Z-Blog官方關於這個錯誤的說明，也可以到<a href="http://bbs.zblogcn.com/" target="_blank">Z-Blog官方論壇</a>，附上錯誤詳細截圖與描述尋求幫助。
+            如果您是站長，您可以點擊<a href="{%morehelp%}" target="_blank">【更多幫助】</a>來查看Z-Blog官方關於這個錯誤的說明，也可以到<a href="https://bbs.zblogcn.com/" target="_blank">Z-Blog官方論壇</a>，附上錯誤詳細截圖與描述尋求幫助。
 		',
     ),
 

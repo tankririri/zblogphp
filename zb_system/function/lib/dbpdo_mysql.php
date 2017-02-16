@@ -77,7 +77,6 @@ class Dbpdo_MySQL implements iDataBase {
             }else{
                 $u = "utf8";
             }
-            //$db_link->setAttribute(PDO::MYSQL_ATTR_INIT_COMMAND, "SET NAMES '" . $u . "'");
             $db_link->query("SET NAMES '" . $u . "'");
 
             return true;
@@ -118,10 +117,11 @@ class Dbpdo_MySQL implements iDataBase {
             }
         }
         if ($c == 0) {
-            $this->db->exec($this->sql->Filter('CREATE DATABASE ' . $dbmysql_name));
-
+            $r = $this->db->exec($this->sql->Filter('CREATE DATABASE ' . $dbmysql_name));
+            if($r === false)return false;
             return true;
         }
+
     }
 
     /**

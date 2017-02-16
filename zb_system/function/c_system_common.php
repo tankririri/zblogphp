@@ -7,7 +7,7 @@
  */
 
 /**
- * 得到请求方法
+ * 得到请求方法(未必会准确的，比如SERVER没有某项，或是端口改过的)
  * @param $array
  * @return $string
  */
@@ -18,6 +18,10 @@ function GetScheme($array) {
         }
     } elseif (array_key_exists('HTTPS', $array)) {
         if (strtolower($array['HTTPS']) == 'on') {
+            return 'https://';
+        }
+    } elseif (array_key_exists('SERVER_PORT', $array)) {
+        if (strtolower($array['SERVER_PORT']) == '443') {
             return 'https://';
         }
     }
@@ -33,16 +37,20 @@ function GetWebServer() {
         return SERVER_UNKNOWN;
     }
     $webServer = strtolower($_SERVER['SERVER_SOFTWARE']);
-    if (strpos($webServer, 'apache')) {
+    if (strpos($webServer, 'apache') !== false) {
         return SERVER_APACHE;
-    } elseif (strpos($webServer, 'microsoft-iis')) {
+    } elseif (strpos($webServer, 'microsoft-iis') !== false) {
         return SERVER_IIS;
-    } elseif (strpos($webServer, 'nginx')) {
+    } elseif (strpos($webServer, 'nginx') !== false) {
         return SERVER_NGINX;
-    } elseif (strpos($webServer, 'lighttpd')) {
+    } elseif (strpos($webServer, 'lighttpd') !== false) {
         return SERVER_LIGHTTPD;
-    } elseif (strpos($webServer, 'kangle')) {
+    } elseif (strpos($webServer, 'kangle') !== false) {
         return SERVER_KANGLE;
+    } elseif (strpos($webServer, 'caddy') !== false) {
+        return SERVER_CADDY;
+    } elseif (strpos($webServer, 'development server') !== false) {
+        return SERVER_BUILTIN;
     } else {
         return SERVER_UNKNOWN;
     }
@@ -83,6 +91,16 @@ function GetPHPEngine() {
 }
 
 /**
+ * 获取PHP Version
+ * @return string
+ */
+function GetPHPVersion() {
+    $p = phpversion();
+    if (strpos($p, '-') !== false) $p = substr($p, 0, strpos($p, '-'));
+    return $p;
+}
+
+/**
  * 自动加载类文件
  * @api Filter_Plugin_Autoload
  * @param string $classname 类名
@@ -90,9 +108,8 @@ function GetPHPEngine() {
  */
 function AutoloadClass($classname) {
     foreach ($GLOBALS['hooks']['Filter_Plugin_Autoload'] as $fpname => &$fpsignal) {
-        $fpsignal = PLUGIN_EXITSIGNAL_NONE;
         $fpreturn = $fpname($classname);
-        if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+        if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
     }
     if (is_readable($f = ZBP_PATH . 'zb_system/function/lib/' . strtolower($classname) . '.php')) {
         require $f;
@@ -108,9 +125,8 @@ function AutoloadClass($classname) {
 function Logs($s, $iserror = false) {
     global $zbp;
     foreach ($GLOBALS['hooks']['Filter_Plugin_Logs'] as $fpname => &$fpsignal) {
-        $fpsignal = PLUGIN_EXITSIGNAL_NONE;
         $fpreturn = $fpname($s, $iserror);
-        if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {return $fpreturn;}
+        if ($fpsignal == PLUGIN_EXITSIGNAL_RETURN) {$fpsignal = PLUGIN_EXITSIGNAL_NONE;return $fpreturn;}
     }
     if ($zbp->guid) {
         if ($iserror) {
@@ -181,12 +197,11 @@ function GetEnvironment() {
     if ($ajax) {
         $ajax = substr(get_class($ajax), 7);
     }
-
     $system_environment = PHP_OS . '; ' .
     GetValueInArray(
         explode(' ', str_replace(array('Microsoft-', '/'), array('', ''), GetVars('SERVER_SOFTWARE', 'SERVER'))), 0
     ) . '; ' .
-    'PHP ' . phpversion() . (IS_X64 ? ' x64' : '') . '; ' .
+    'PHP ' . GetPHPVersion() . (IS_X64 ? ' x64' : '') . '; ' .
     $zbp->option['ZC_DATABASE_TYPE'] . '; ' . $ajax;
 
     return $system_environment;
@@ -329,6 +344,23 @@ function GetCurrentHost($blogpath, &$cookiespath) {
     $host = HTTP_SCHEME;
 
     $host .= $_SERVER['HTTP_HOST'];
+
+    if (isset($_SERVER['SCRIPT_NAME']) && $_SERVER['SCRIPT_NAME']) {
+        $x = $_SERVER['SCRIPT_NAME'];
+        $y = $blogpath;
+        $z = '';
+        for ($i=0; $i < strlen($x) ; $i++) { 
+            $f = $y . substr($x, $i - strlen($x));
+            $z = substr($x,0,$i);
+            if ( file_exists($f)  && is_file($f) ){
+                $z = trim($z,'/');
+                $z = '/' . $z . '/';
+                $z = str_replace('//', '/', $z);
+                $cookiespath = $z;
+                return $host . $z;
+            }
+        }
+    }
 
     $x = $_SERVER['SCRIPT_NAME'];
     $y = $blogpath;
@@ -853,11 +885,11 @@ function JsonError($errorCode, $errorString, $data) {
         'err' => array(
             'code' => $errorCode,
             'msg' => $errorString,
-            'runtime' => RunTime(),
+            //'runtime' => RunTime(),
             'timestamp' => time(),
         ),
     );
-    ob_clean();
+    @ob_clean();
     echo json_encode($result);
     if ($errorCode != 0) {
         exit;
@@ -914,6 +946,8 @@ function ScriptError($faultString) {
 function CheckRegExp($source, $para) {
     if (strpos($para, '[username]') !== false) {
         $para = "/^[\.\_A-Za-z0-9·@\x{4e00}-\x{9fa5}]+$/u";
+    } elseif (strpos($para, '[nickname]') !== false) {
+        $para = '/([^\x{01}-\x{1F}\x{80}-\x{FF}\/:\\~&%;@\'"?<>|#$\*}{,\+=\[\]\(\)\{\}\t\r\n\p{C}])/u';
     } elseif (strpos($para, '[password]') !== false) {
         $para = "/^[A-Za-z0-9`~!@#\$%\^&\*\-_\?]+$/u";
     } elseif (strpos($para, '[email]') !== false) {
@@ -1303,6 +1337,40 @@ function utf84mb_convertToUTF8($matches) {
     return iconv('UCS-4', 'UTF-8', hex2bin(str_pad($matches[1], 8, "0", STR_PAD_LEFT)));
 }
 
+
+//$args = 2...x
+function VerifyWebToken($wt,$wt_id){
+    $time = substr($wt,32);
+    $wt = substr($wt,0,32);
+    $args = array();
+    for ($i = 2; $i < func_num_args() ; $i++) { 
+        $args[] = func_get_arg($i);
+    }
+    $sha = md5( hash("sha256", $time . $wt_id) . hash("sha256", implode($args) . $time) );
+    if ($wt === $sha){
+        if ($time > time()){
+            return true;
+        }
+    }
+
+    return false;
+}
+//$time : expired second
+function CreateWebToken($wt_id,$time){
+    $time = (int)$time;
+    $args = array();
+    for ($i = 2; $i < func_num_args() ; $i++) { 
+        $args[] = func_get_arg($i);
+    }
+    return md5( hash("sha256", $time . $wt_id) . hash("sha256", implode($args) . $time) ) . $time;
+}
+
+
+
+/**
+ * 处理PHP版本兼容代码
+ */
+
 if (!function_exists('hex2bin')) {
     function hex2bin($str) {
         $sbin = "";
@@ -1318,19 +1386,319 @@ if (!function_exists('hex2bin')) {
 if (!function_exists('rrmdir')) {
     function rrmdir($dir) {
         if (is_dir($dir)) {
-            $objects = scandir($dir);
-            foreach ($objects as $object) {
-                if ($object != '.' && $object != '..') {
-                    if (filetype($dir . '/' . $object) == 'dir') {
-                        rrmdir($dir . '/' . $object);
-                    } else {
-                        unlink($dir . '/' . $object);
+            if (function_exists('scandir')) {
+                $objects = scandir($dir);
+                foreach ($objects as $object) {
+                    if ($object != '.' && $object != '..') {
+                        if (filetype($dir . '/' . $object) == 'dir') {
+                            rrmdir($dir . '/' . $object);
+                        } else {
+                            unlink($dir . '/' . $object);
+                        }
                     }
-
+                }
+                reset($objects);
+                rmdir($dir);
+            } else {
+                if ($handle = opendir($dir)) {
+                    while (false !== ($file = readdir($handle))) {
+                        if ($file != "." && $file != "..") {
+                            if (is_dir(rtrim(rtrim($dir, '/'), '\\') . '/' . $file)) {
+                                rrmdir(rtrim(rtrim($dir, '/'), '\\') . '/' . $file);
+                            } else {
+                                unlink(rtrim(rtrim($dir, '/'), '\\') . '/' . $file);
+                            }
+                        }
+                    }
+                    closedir($handle);
+                    rmdir($dir);
                 }
             }
-            reset($objects);
-            rmdir($dir);
+        }
+    }
+}
+
+/**
+ * URL constants as defined in the PHP Manual under "Constants usable with
+ * http_build_url()".
+ *
+ * @see http://us2.php.net/manual/en/http.constants.php#http.constants.url
+ * @see  https://github.com/jakeasmith/http_build_url/blob/master/src/http_build_url.php
+ * @license  MIT
+ */
+if (!defined('HTTP_URL_REPLACE')) {
+    define('HTTP_URL_REPLACE', 1);
+}
+if (!defined('HTTP_URL_JOIN_PATH')) {
+    define('HTTP_URL_JOIN_PATH', 2);
+}
+if (!defined('HTTP_URL_JOIN_QUERY')) {
+    define('HTTP_URL_JOIN_QUERY', 4);
+}
+if (!defined('HTTP_URL_STRIP_USER')) {
+    define('HTTP_URL_STRIP_USER', 8);
+}
+if (!defined('HTTP_URL_STRIP_PASS')) {
+    define('HTTP_URL_STRIP_PASS', 16);
+}
+if (!defined('HTTP_URL_STRIP_AUTH')) {
+    define('HTTP_URL_STRIP_AUTH', 32);
+}
+if (!defined('HTTP_URL_STRIP_PORT')) {
+    define('HTTP_URL_STRIP_PORT', 64);
+}
+if (!defined('HTTP_URL_STRIP_PATH')) {
+    define('HTTP_URL_STRIP_PATH', 128);
+}
+if (!defined('HTTP_URL_STRIP_QUERY')) {
+    define('HTTP_URL_STRIP_QUERY', 256);
+}
+if (!defined('HTTP_URL_STRIP_FRAGMENT')) {
+    define('HTTP_URL_STRIP_FRAGMENT', 512);
+}
+if (!defined('HTTP_URL_STRIP_ALL')) {
+    define('HTTP_URL_STRIP_ALL', 1024);
+}
+if (!function_exists('http_build_url')) {
+    /**
+     * Build a URL.
+     *
+     * The parts of the second URL will be merged into the first according to
+     * the flags argument.
+     *
+     * @param mixed $url     (part(s) of) an URL in form of a string or
+     *                       associative array like parse_url() returns
+     * @param mixed $parts   same as the first argument
+     * @param int   $flags   a bitmask of binary or'ed HTTP_URL constants;
+     *                       HTTP_URL_REPLACE is the default
+     * @param array $new_url if set, it will be filled with the parts of the
+     *                       composed url like parse_url() would return
+     * @return string
+     */
+    function http_build_url($url, $parts = array(), $flags = HTTP_URL_REPLACE, &$new_url = array()) {
+        is_array($url) || $url = parse_url($url);
+        is_array($parts) || $parts = parse_url($parts);
+        isset($url['query']) && is_string($url['query']) || $url['query'] = null;
+        isset($parts['query']) && is_string($parts['query']) || $parts['query'] = null;
+        $keys = array('user', 'pass', 'port', 'path', 'query', 'fragment');
+        // HTTP_URL_STRIP_ALL and HTTP_URL_STRIP_AUTH cover several other flags.
+        if ($flags & HTTP_URL_STRIP_ALL) {
+            $flags |= HTTP_URL_STRIP_USER | HTTP_URL_STRIP_PASS
+                | HTTP_URL_STRIP_PORT | HTTP_URL_STRIP_PATH
+                | HTTP_URL_STRIP_QUERY | HTTP_URL_STRIP_FRAGMENT;
+        } elseif ($flags & HTTP_URL_STRIP_AUTH) {
+            $flags |= HTTP_URL_STRIP_USER | HTTP_URL_STRIP_PASS;
+        }
+        // Schema and host are alwasy replaced
+        foreach (array('scheme', 'host') as $part) {
+            if (isset($parts[$part])) {
+                $url[$part] = $parts[$part];
+            }
+        }
+        if ($flags & HTTP_URL_REPLACE) {
+            foreach ($keys as $key) {
+                if (isset($parts[$key])) {
+                    $url[$key] = $parts[$key];
+                }
+            }
+        } else {
+            if (isset($parts['path']) && ($flags & HTTP_URL_JOIN_PATH)) {
+                if (isset($url['path']) && substr($parts['path'], 0, 1) !== '/') {
+                    // Workaround for trailing slashes
+                    $url['path'] .= 'a';
+                    $url['path'] = rtrim(
+                            str_replace(basename($url['path']), '', $url['path']),
+                            '/'
+                        ) . '/' . ltrim($parts['path'], '/');
+                } else {
+                    $url['path'] = $parts['path'];
+                }
+            }
+            if (isset($parts['query']) && ($flags & HTTP_URL_JOIN_QUERY)) {
+                if (isset($url['query'])) {
+                    parse_str($url['query'], $url_query);
+                    parse_str($parts['query'], $parts_query);
+                    $url['query'] = http_build_query(
+                        array_replace_recursive(
+                            $url_query,
+                            $parts_query
+                        )
+                    );
+                } else {
+                    $url['query'] = $parts['query'];
+                }
+            }
+        }
+        if (isset($url['path']) && $url['path'] !== '' && substr($url['path'], 0, 1) !== '/') {
+            $url['path'] = '/' . $url['path'];
+        }
+        foreach ($keys as $key) {
+            $strip = 'HTTP_URL_STRIP_' . strtoupper($key);
+            if ($flags & constant($strip)) {
+                unset($url[$key]);
+            }
+        }
+        $parsed_string = '';
+        if (!empty($url['scheme'])) {
+            $parsed_string .= $url['scheme'] . '://';
+        }
+        if (!empty($url['user'])) {
+            $parsed_string .= $url['user'];
+            if (isset($url['pass'])) {
+                $parsed_string .= ':' . $url['pass'];
+            }
+            $parsed_string .= '@';
+        }
+        if (!empty($url['host'])) {
+            $parsed_string .= $url['host'];
+        }
+        if (!empty($url['port'])) {
+            $parsed_string .= ':' . $url['port'];
+        }
+        if (!empty($url['path'])) {
+            $parsed_string .= $url['path'];
+        }
+        if (!empty($url['query'])) {
+            $parsed_string .= '?' . $url['query'];
+        }
+        if (!empty($url['fragment'])) {
+            $parsed_string .= '#' . $url['fragment'];
+        }
+        $new_url = $url;
+
+        return $parsed_string;
+    }
+}
+
+if (!function_exists('gzdecode')) {
+ function gzdecode($data) {
+   $len = strlen($data);
+   if ($len < 18 || strcmp(substr($data, 0, 2), "\x1f\x8b")) {
+     return null;  // Not GZIP format (See RFC 1952)
+   }
+   $method = ord(substr($data, 2, 1));  // Compression method
+   $flags  = ord(substr($data, 3, 1));  // Flags
+   if ($flags & 31 != $flags) {
+     // Reserved bits are set -- NOT ALLOWED by RFC 1952
+     return null;
+   }
+   // NOTE: $mtime may be negative (PHP integer limitations)
+   $mtime = unpack("V", substr($data, 4, 4));
+   $mtime = $mtime[1];
+   $xfl   = substr($data, 8, 1);
+   $os    = substr($data, 8, 1);
+   $headerlen = 10;
+   $extralen  = 0;
+   $extra     = "";
+   if ($flags & 4) {
+     // 2-byte length prefixed EXTRA data in header
+     if ($len - $headerlen - 2 < 8) {
+       return false;    // Invalid format
+     }
+     $extralen = unpack("v", substr($data, 8, 2));
+     $extralen = $extralen[1];
+     if ($len - $headerlen - 2 - $extralen < 8) {
+       return false;    // Invalid format
+     }
+     $extra = substr($data, 10, $extralen);
+     $headerlen += 2 + $extralen;
+   }
+
+   $filenamelen = 0;
+   $filename = "";
+   if ($flags & 8) {
+     // C-style string file NAME data in header
+     if ($len - $headerlen - 1 < 8) {
+       return false;    // Invalid format
+     }
+     $filenamelen = strpos(substr($data, 8 + $extralen), chr(0));
+     if ($filenamelen === false || $len - $headerlen - $filenamelen - 1 < 8) {
+       return false;    // Invalid format
+     }
+     $filename = substr($data, $headerlen, $filenamelen);
+     $headerlen += $filenamelen + 1;
+   }
+
+   $commentlen = 0;
+   $comment = "";
+   if ($flags & 16) {
+     // C-style string COMMENT data in header
+     if ($len - $headerlen - 1 < 8) {
+       return false;    // Invalid format
+     }
+     $commentlen = strpos(substr($data, 8 + $extralen + $filenamelen), chr(0));
+     if ($commentlen === false || $len - $headerlen - $commentlen - 1 < 8) {
+       return false;    // Invalid header format
+     }
+     $comment = substr($data, $headerlen, $commentlen);
+     $headerlen += $commentlen + 1;
+   }
+
+   $headercrc = "";
+   if ($flags & 2) {
+     // 2-bytes (lowest order) of CRC32 on header present
+     if ($len - $headerlen - 2 < 8) {
+       return false;    // Invalid format
+     }
+     $calccrc = crc32(substr($data, 0, $headerlen)) & 0xffff;
+     $headercrc = unpack("v", substr($data, $headerlen, 2));
+     $headercrc = $headercrc[1];
+     if ($headercrc != $calccrc) {
+       return false;    // Bad header CRC
+     }
+     $headerlen += 2;
+   }
+
+   // GZIP FOOTER - These be negative due to PHP's limitations
+   $datacrc = unpack("V", substr($data, -8, 4));
+   $datacrc = $datacrc[1];
+   $isize = unpack("V", substr($data, -4));
+   $isize = $isize[1];
+
+   // Perform the decompression:
+   $bodylen = $len - $headerlen - 8;
+   if ($bodylen < 1) {
+     // This should never happen - IMPLEMENTATION BUG!
+     return null;
+   }
+   $body = substr($data, $headerlen, $bodylen);
+   $data = "";
+   if ($bodylen > 0) {
+     switch ($method) {
+       case 8:
+         // Currently the only supported compression method:
+         $data = gzinflate($body);
+         break;
+       default:
+         // Unknown compression method
+         return false;
+     }
+   } else {
+     // I'm not sure if zero-byte body content is allowed.
+     // Allow it for now...  Do nothing...
+   }
+
+   // Verifiy decompressed size and CRC32:
+   // NOTE: This may fail with large data sizes depending on how
+   //       PHP's integer limitations affect strlen() since $isize
+   //       may be negative for large sizes.
+   if ($isize != strlen($data) || crc32($data) != $datacrc) {
+     // Bad format!  Length or CRC doesn't match!
+     return false;
+   }
+
+   return $data;
+ }
+}
+
+if ( !function_exists('session_status') ){
+    function session_status(){
+        if(!extension_loaded('session')){
+            return 0;
+        }elseif(!session_id()){
+            return 1;
+        }else{
+            return 2;
         }
     }
 }

@@ -54,15 +54,16 @@ if (isset($_POST['act'])) {
             exit();
             break;
         case 'e_edit':
-            $config = $zbp->configs[$_POST['name2']]->$_POST['name1'];
+ $name1=$_POST['name1']; 
+			$config = $zbp->configs[$_POST['name2']]->$name1;
             $value = $_POST['post'];
             if (gettype($config) == 'boolean') {
                 $value = (bool) $value;
             } elseif (gettype($config) == 'integer') {
                 $value = (int) $value;
             }
-
-            $zbp->configs[$_POST['name2']]->$_POST['name1'] = $value;
+ $name1=$_POST['name1'];
+			$zbp->configs[$_POST['name2']]->$name1 = $value;
             $zbp->SaveConfig($_POST['name2']);
             echo blogconfig_exportlist($_POST['name2']);
             exit();
@@ -76,6 +77,8 @@ require $blogpath . 'zb_system/admin/admin_header.php';
 <link rel="stylesheet" href="../../css/jquery.contextMenu.css" type="text/css" media="screen"/>
 <script type="text/javascript" src="../../js/jquery.contextMenu.js"></script>
 <script type="text/javascript" src="BlogConfig.js"></script>
+<script src="../../../../../zb_system/script/c_admin_js_add.php" type="text/javascript"></script>
+<script src="../../../../../zb_system/script/jquery-ui.custom.min.js" type="text/javascript"></script>
 <?php
 require $blogpath . 'zb_system/admin/admin_top.php';
 ?>
